@@ -1,20 +1,23 @@
 # 🔬 OOE VIRTUAL LABORATORY: OPTICAL & EM SYSTEMS
 **Institution:** National Higher School of Advanced Technologies (ENSTA)  
 **Module:** Physics / Computer Vision  
+**Academic Year:** 2025–2026  
 **Supervisor:** Dr. CHEGGOU Rabéa  
-**Status:** Project Archiving & Collection Phase  
 
 ---
 
-> **📌 NOTE FOR STUDENTS:** This GitHub repository has been established for a **Better Collection** and professional archiving of your submitted works. It serves as the official digital library for the MI2 OOE projects (2025–2026).
+> **📌 NOTE FOR STUDENTS:** This GitHub repository has been established for a **Better Collection** and professional archiving of your submitted works. It serves as the official digital library for the MI2 OOE projects.
 
 ---
 
 ## 👥 TEAM IDENTIFICATION
 *To be completed by the Project Leader:*
-- **Project Leader:** [Name Here]
-- **Group:** [Number]
-- **Team Members:** (Full Names of all contributors)
+- **Project Leader:** [Full Name]
+- **Group Number:** [e.g., G1, G2...]
+- **Team Members:**
+  1. [Name 1]
+  2. [Name 2]
+  3. [Name 3]
 
 ---
 
@@ -42,12 +45,13 @@
 
 ## 🚀 SUBMISSION INSTRUCTIONS (FOR PROJECT LEADERS)
 
-⚠️ **Strict Policy:** To maintain a clean archive, only the **Project Leader (Chef de Projet)** is authorized to manage the repository and push the final code.
+⚠️ **Strict Policy:** Only the **Project Leader (Chef de Projet)** is authorized to manage the repository and push the final code.
 
-1. **Fork:** The Leader must fork this repository.
-2. **Team Info:** Ensure all member names and the group number are clearly listed above.
-3. **Code Quality:** Upload all functional HTML/JS simulations and technical documentation.
-4. **Final Link:** Provide the repository URL for final evaluation and archiving.
+1. **Fork:** The Project Leader must fork this repository.
+2. **Identification:** Fill in the "Team Identification" section above.
+3. **Upload:** Push your HTML/JS simulations and technical documentation to your fork.
+4. **GitHub Pages:** Activate "GitHub Pages" in your settings to make your simulation live.
+5. **Final Link:** Share your repository URL with Dr. Cheggou for final archiving.
 
 ---
-**Thank you for your contributions!**
+**Thank you for your professional contribution!**
