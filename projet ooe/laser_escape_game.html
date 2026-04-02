@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Grille Laser — Escape Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red: #ff1a1a;
+    --red-glow: rgba(255,26,26,0.6);
+    --green: #00ff88;
+    --green-glow: rgba(0,255,136,0.6);
+    --dark: #0a0a0a;
+    --panel: rgba(255,255,255,0.03);
+    --border: rgba(255,26,26,0.2);
+    --mirror-color: rgba(150,220,255,0.85);
+    --mirror-glow: rgba(150,220,255,0.5);
+  }
+
+  body {
+    background: var(--dark);
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,26,26,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,26,26,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scanline effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.1) 2px,
+      rgba(0,0,0,0.1) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 10px 20px 6px;
+    width: 100%;
+  }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(14px, 2vw, 22px);
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    color: var(--red);
+    text-shadow: 0 0 20px var(--red-glow), 0 0 40px var(--red-glow);
+    text-transform: uppercase;
+  }
+
+  .subtitle {
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.2em;
+    margin-top: 2px;
+  }
+
+  .game-wrapper {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 12px;
+    width: 100%;
+    max-width: 1200px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Side panel */
+  .side-panel {
+    width: 180px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .panel-block {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    position: relative;
+  }
+
+  .panel-block::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--red);
+    box-shadow: 0 0 10px var(--red-glow);
+  }
+
+  .panel-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .panel-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    color: var(--red);
+    text-shadow: 0 0 15px var(--red-glow);
+  }
+
+  .level-dots {
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+
+  .dot {
+    width: 10px; height: 10px;
+    border: 1px solid rgba(255,26,26,0.4);
+    background: transparent;
+    transition: all 0.3s;
+  }
+
+  .dot.done {
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red-glow);
+  }
+
+  .dot.current {
+    border-color: var(--red);
+    animation: pulse-dot 1s ease-in-out infinite alternate;
+  }
+
+  @keyframes pulse-dot {
+    from { box-shadow: 0 0 4px var(--red-glow); }
+    to { box-shadow: 0 0 12px var(--red-glow); }
+  }
+
+  .instruction-list {
+    font-size: 10px;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.8;
+  }
+
+  .instruction-list li {
+    list-style: none;
+    padding-left: 12px;
+    position: relative;
+  }
+
+  .instruction-list li::before {
+    content: '›';
+    position: absolute;
+    left: 0;
+    color: var(--red);
+  }
+
+  /* Canvas area */
+  .canvas-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .canvas-frame {
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    background: rgba(0,0,0,0.7);
+    flex: 1;
+  }
+
+  .canvas-frame::before,
+  .canvas-frame::after {
+    content: '';
+    position: absolute;
+    width: 20px; height: 20px;
+    z-index: 5;
+  }
+
+  .canvas-frame::before {
+    top: 0; left: 0;
+    border-top: 2px solid var(--red);
+    border-left: 2px solid var(--red);
+    box-shadow: -2px -2px 10px var(--red-glow);
+  }
+
+  .canvas-frame::after {
+    bottom: 0; right: 0;
+    border-bottom: 2px solid var(--red);
+    border-right: 2px solid var(--red);
+    box-shadow: 2px 2px 10px var(--red-glow);
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  /* Bottom bar */
+  .bottom-bar {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--red);
+    transform: translateX(-100%);
+    transition: transform 0.2s;
+    z-index: -1;
+  }
+
+  .btn:hover {
+    color: #000;
+    box-shadow: 0 0 20px var(--red-glow);
+  }
+
+  .btn:hover::before { transform: translateX(0); }
+
+  .btn.success {
+    border-color: var(--green);
+    color: var(--green);
+    animation: success-pulse 0.5s ease-in-out 3;
+  }
+
+  @keyframes success-pulse {
+    0%, 100% { box-shadow: 0 0 10px var(--green-glow); }
+    50% { box-shadow: 0 0 30px var(--green-glow), 0 0 60px var(--green-glow); }
+  }
+
+  .status-text {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    flex: 1;
+    text-align: center;
+    letter-spacing: 0.1em;
+  }
+
+  .status-text.success { color: var(--green); text-shadow: 0 0 10px var(--green-glow); }
+  .status-text.error { color: var(--red); text-shadow: 0 0 10px var(--red-glow); }
+
+  /* Mirror tooltip */
+  .mirror-info {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 9px;
+    color: rgba(150,220,255,0.7);
+    letter-spacing: 0.1em;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Overlay screens */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(4px);
+  }
+
+  .overlay.hidden { display: none; }
+
+  .overlay h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(20px, 4vw, 36px);
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    margin-bottom: 16px;
+  }
+
+  .overlay.win h2 { color: var(--green); text-shadow: 0 0 30px var(--green-glow); }
+  .overlay.fail h2 { color: var(--red); text-shadow: 0 0 30px var(--red-glow); }
+  .overlay.intro h2 { color: var(--red); text-shadow: 0 0 30px var(--red-glow); }
+
+  .overlay p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    text-align: center;
+    max-width: 400px;
+    line-height: 1.7;
+  }
+
+  .overlay .physics-note {
+    font-size: 11px;
+    color: rgba(255,255,255,0.35);
+    border: 1px solid rgba(255,26,26,0.2);
+    padding: 10px 20px;
+    margin: 12px 0 20px;
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+
+  .angle-display {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: rgba(150,220,255,0.8);
+    margin: 4px 0;
+    letter-spacing: 0.1em;
+  }
+
+  /* Timer bar */
+  .timer-bar {
+    width: 100%;
+    height: 3px;
+    background: rgba(255,26,26,0.15);
+    margin-top: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .timer-fill {
+    height: 100%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red-glow);
+    transition: width 1s linear;
+  }
+</style>
+</head>
+<body>
+
+<!-- INTRO OVERLAY -->
+<div class="overlay intro" id="introOverlay">
+  <h2>⚡ LA GRILLE LASER</h2>
+  <p>Mission : Rediriger le faisceau laser à l'aide de 2 miroirs plans pour atteindre le capteur de sécurité.</p>
+  <div class="physics-note">
+    Loi de la réflexion : i = r<br>
+    Angle d'incidence = Angle de réflexion<br>
+    M1 ⊥ M2 → rayon final parallèle, sens inversé
+  </div>
+  <p style="font-size:11px; color:rgba(255,255,255,0.4);">
+    Faites glisser les miroirs · Clic droit pour faire pivoter
+  </p>
+  <button class="btn" onclick="startGame()" style="margin-top:16px; font-size:12px; padding:12px 30px;">
+    DÉMARRER LA MISSION
+  </button>
+</div>
+
+<!-- WIN OVERLAY -->
+<div class="overlay win hidden" id="winOverlay">
+  <h2>✓ MISSION ACCOMPLIE</h2>
+  <p id="winMsg">Le capteur est activé ! Laser redirigé avec succès.</p>
+  <div class="angle-display" id="winAngles"></div>
+  <div class="physics-note" id="winPhysics"></div>
+  <button class="btn" onclick="nextLevel()" style="margin-top:16px; border-color:var(--green); color:var(--green);">
+    NIVEAU SUIVANT →
+  </button>
+</div>
+
+<!-- FAIL OVERLAY -->
+<div class="overlay fail hidden" id="failOverlay">
+  <h2>✗ ALARME DÉCLENCHÉE</h2>
+  <p>Le laser n'a pas atteint le capteur. Repositionnez les miroirs.</p>
+  <button class="btn" onclick="retryLevel()" style="margin-top:16px;">RÉESSAYER</button>
+</div>
+
+<!-- COMPLETE OVERLAY -->
+<div class="overlay win hidden" id="completeOverlay">
+  <h2>🏆 ESCAPE RÉUSSI !</h2>
+  <p>Tous les niveaux complétés.<br>Vous maîtrisez la loi de la réflexion !</p>
+  <div class="physics-note">
+    Résumé : Deux miroirs perpendiculaires (90°) renvoient<br>
+    toujours le faisceau parallèlement à sa direction initiale,<br>
+    mais en sens opposé. → direction finale = −direction initiale
+  </div>
+  <button class="btn" onclick="resetGame()" style="margin-top:16px;">REJOUER</button>
+</div>
+
+<header>
+  <h1>La Grille Laser</h1>
+  <div class="subtitle">Optique Géométrique — Miroirs Plans</div>
+</header>
+
+<div class="game-wrapper">
+  <!-- Side panel -->
+  <div class="side-panel">
+    <div class="panel-block">
+      <div class="panel-label">Niveau</div>
+      <div class="panel-value" id="levelDisplay">01</div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Progression</div>
+      <div class="level-dots" id="levelDots"></div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Angle M1</div>
+      <div class="angle-display" id="m1Angle" style="font-family:'Orbitron';font-size:16px;color:rgba(150,220,255,0.9);">—°</div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Angle M2</div>
+      <div class="angle-display" id="m2Angle" style="font-family:'Orbitron';font-size:16px;color:rgba(150,220,255,0.9);">—°</div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Réflexions</div>
+      <div class="panel-value" id="reflectCount">0</div>
+    </div>
+
+    <div class="panel-block">
+      <div class="panel-label">Instructions</div>
+      <ul class="instruction-list">
+        <li>Glisser = déplacer</li>
+        <li>Clic droit = pivoter</li>
+        <li>i = r toujours</li>
+        <li>M1 ⊥ M2 au niveau 1</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-container">
+    <div class="canvas-frame" id="canvasFrame">
+      <canvas id="gameCanvas"></canvas>
+      <div class="mirror-info" id="mirrorInfo">MIROIRS ACTIFS : 2</div>
+    </div>
+
+    <div class="bottom-bar">
+      <button class="btn" id="checkBtn" onclick="checkSolution()">VÉRIFIER</button>
+      <div class="status-text" id="statusText">Positionnez les miroirs pour guider le laser</div>
+      <button class="btn" onclick="resetLevel()">RESET</button>
+    </div>
+
+    <div class="timer-bar">
+      <div class="timer-fill" id="timerFill" style="width:100%"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// GAME ENGINE
+// =====================================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const frame = document.getElementById('canvasFrame');
+
+let W, H;
+let gameState = 'playing';
+let currentLevel = 0;
+let completedLevels = [];
+let timerInterval = null;
+let timeLeft = 60;
+
+// Mirror object
+class Mirror {
+  constructor(x, y, length, angle, id) {
+    this.x = x; this.y = y;
+    this.length = length;
+    this.angle = angle; // radians
+    this.id = id;
+    this.dragging = false;
+    this.dragOffX = 0; this.dragOffY = 0;
+    this.highlight = false;
+    this.glowPhase = Math.random() * Math.PI * 2;
+  }
+
+  get p1() {
+    return {
+      x: this.x - Math.cos(this.angle) * this.length / 2,
+      y: this.y - Math.sin(this.angle) * this.length / 2
+    };
+  }
+
+  get p2() {
+    return {
+      x: this.x + Math.cos(this.angle) * this.length / 2,
+      y: this.y + Math.sin(this.angle) * this.length / 2
+    };
+  }
+
+  getNormal() {
+    // Normal vector (perpendicular to mirror)
+    return {
+      x: -Math.sin(this.angle),
+      y: Math.cos(this.angle)
+    };
+  }
+
+  draw(t) {
+    const p1 = this.p1, p2 = this.p2;
+    const glow = this.highlight ? 15 : 6 + 3 * Math.sin(t * 0.003 + this.glowPhase);
+
+    // Glow
+    ctx.save();
+    ctx.strokeStyle = `rgba(150,220,255,${this.highlight ? 0.9 : 0.5})`;
+    ctx.lineWidth = this.highlight ? 4 : 2;
+    ctx.shadowColor = 'rgba(150,220,255,0.8)';
+    ctx.shadowBlur = glow;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    // Mirror surface sheen
+    ctx.strokeStyle = 'rgba(220,240,255,0.95)';
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    // End caps
+    ctx.fillStyle = 'rgba(150,220,255,0.8)';
+    ctx.beginPath(); ctx.arc(p1.x, p1.y, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p2.x, p2.y, 3, 0, Math.PI*2); ctx.fill();
+
+    // Label
+    const deg = (this.angle * 180 / Math.PI % 180 + 180) % 180;
+    ctx.fillStyle = `rgba(150,220,255,${this.highlight ? 1 : 0.6})`;
+    ctx.font = '9px Share Tech Mono';
+    ctx.fillText(`M${this.id}  ${Math.round(deg)}°`, this.x + 8, this.y - 8);
+
+    ctx.restore();
+  }
+
+  hitTest(mx, my) {
+    const p1 = this.p1, p2 = this.p2;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const t = ((mx-p1.x)*dx + (my-p1.y)*dy) / (len*len);
+    if (t < 0 || t > 1) return false;
+    const px = p1.x + t*dx - mx, py = p1.y + t*dy - my;
+    return Math.sqrt(px*px + py*py) < 10;
+  }
+}
+
+// =====================================================
+// LEVELS
+// =====================================================
+function makeLevels() {
+  return [
+    // Level 1: Simple - two perp mirrors, easy angle
+    {
+      name: "INITIATION",
+      laser: { x: 0.08, y: 0.45, dir: 0 }, // horizontal right
+      target: { x: 0.92, y: 0.55 },
+      targetRadius: 22,
+      mirrors: [
+        new Mirror(0.35, 0.45, 0, -Math.PI/4, 1),  // 45° mirror
+        new Mirror(0.65, 0.45, 0, Math.PI/4, 2),   // -45° mirror
+      ],
+      hint: "Utilisez deux miroirs à 45° perpendiculaires entre eux",
+      obstacleCount: 0
+    },
+    // Level 2: Guide around obstacle
+    {
+      name: "CONTOURNEMENT",
+      laser: { x: 0.08, y: 0.3, dir: 0 },
+      target: { x: 0.92, y: 0.7 },
+      targetRadius: 20,
+      mirrors: [
+        new Mirror(0.35, 0.3, 0, -Math.PI/4, 1),
+        new Mirror(0.65, 0.7, 0, -Math.PI/4, 2),
+      ],
+      obstacles: [{ x: 0.5, y: 0.5, r: 0.06 }],
+      hint: "Guidez le laser autour de l'obstacle central"
+    },
+    // Level 3: 3 reflections
+    {
+      name: "TRIPLE REBOND",
+      laser: { x: 0.08, y: 0.2, dir: 0 },
+      target: { x: 0.92, y: 0.8 },
+      targetRadius: 18,
+      mirrors: [
+        new Mirror(0.3, 0.2, 0, -Math.PI/4, 1),
+        new Mirror(0.7, 0.5, 0, Math.PI/4, 2),
+      ],
+      obstacles: [],
+      hint: "M1 ⊥ M2 → le rayon ressort parallèle mais inversé"
+    },
+    // Level 4: Tight target
+    {
+      name: "PRÉCISION MAXIMALE",
+      laser: { x: 0.08, y: 0.5, dir: 0 },
+      target: { x: 0.5, y: 0.92 },
+      targetRadius: 16,
+      mirrors: [
+        new Mirror(0.4, 0.5, 0, -Math.PI/4, 1),
+        new Mirror(0.5, 0.72, 0, 0, 2),
+      ],
+      obstacles: [],
+      hint: "Angle de réflexion = Angle d'incidence"
+    }
+  ];
+}
+
+let levels = [];
+let mirrors = [];
+let laser = null;
+let target = null;
+let obstacles = [];
+let laserPath = [];
+let solved = false;
+
+// =====================================================
+// RAY CASTING
+// =====================================================
+function reflect(dir, normal) {
+  const dot = dir.x * normal.x + dir.y * normal.y;
+  return {
+    x: dir.x - 2 * dot * normal.x,
+    y: dir.y - 2 * dot * normal.y
+  };
+}
+
+function normalize(v) {
+  const len = Math.sqrt(v.x*v.x + v.y*v.y);
+  return { x: v.x/len, y: v.y/len };
+}
+
+function raySegmentIntersect(rx, ry, rdx, rdy, p1, p2) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const denom = rdx * dy - rdy * dx;
+  if (Math.abs(denom) < 1e-10) return null;
+  const t = ((p1.x - rx) * dy - (p1.y - ry) * dx) / denom;
+  const u = ((p1.x - rx) * rdy - (p1.y - ry) * rdx) / denom;
+  if (t > 0.001 && u >= 0 && u <= 1) {
+    return { t, x: rx + t*rdx, y: ry + t*rdy };
+  }
+  return null;
+}
+
+function traceRay() {
+  laserPath = [];
+  let ox = laser.x, oy = laser.y;
+  let dir = normalize({ x: Math.cos(laser.dir), y: Math.sin(laser.dir) });
+  let bounces = 0;
+  const MAX_BOUNCES = 10;
+  let reflections = 0;
+  solved = false;
+
+  laserPath.push({ x: ox, y: oy });
+
+  while (bounces < MAX_BOUNCES) {
+    let closest = null;
+    let closestDist = Infinity;
+    let closestMirror = null;
+
+    for (const m of mirrors) {
+      const p1 = m.p1, p2 = m.p2;
+      const hit = raySegmentIntersect(ox, oy, dir.x, dir.y, p1, p2);
+      if (hit && hit.t < closestDist) {
+        closestDist = hit.t;
+        closest = hit;
+        closestMirror = m;
+      }
+    }
+
+    // Wall check
+    let wallHit = null;
+    const walls = [
+      { p1: {x:0,y:0}, p2: {x:W,y:0} },
+      { p1: {x:W,y:0}, p2: {x:W,y:H} },
+      { p1: {x:W,y:H}, p2: {x:0,y:H} },
+      { p1: {x:0,y:H}, p2: {x:0,y:0} }
+    ];
+    for (const w of walls) {
+      const hit = raySegmentIntersect(ox, oy, dir.x, dir.y, w.p1, w.p2);
+      if (hit && hit.t < closestDist) {
+        closestDist = hit.t;
+        wallHit = hit;
+        closestMirror = null;
+      }
+    }
+
+    if (!closest && !wallHit) {
+      laserPath.push({ x: ox + dir.x * 2000, y: oy + dir.y * 2000 });
+      break;
+    }
+
+    const endPt = closest || wallHit;
+    laserPath.push({ x: endPt.x, y: endPt.y });
+
+    // Check target hit
+    const dx = endPt.x - target.x, dy = endPt.y - target.y;
+    if (Math.sqrt(dx*dx + dy*dy) < target.radius) {
+      solved = true;
+      break;
+    }
+    // Also check along segment
+    if (segmentHitsTarget(ox, oy, endPt.x, endPt.y)) {
+      solved = true;
+      break;
+    }
+
+    if (wallHit || !closestMirror) break;
+
+    // Reflect
+    dir = reflect(dir, closestMirror.getNormal());
+    dir = normalize(dir);
+    ox = endPt.x + dir.x * 0.5;
+    oy = endPt.y + dir.y * 0.5;
+    reflections++;
+    bounces++;
+  }
+
+  document.getElementById('reflectCount').textContent = reflections;
+  return reflections;
+}
+
+function segmentHitsTarget(x1, y1, x2, y2) {
+  const dx = x2-x1, dy = y2-y1;
+  const fx = x1-target.x, fy = y1-target.y;
+  const a = dx*dx+dy*dy;
+  const b = 2*(fx*dx+fy*dy);
+  const c = fx*fx+fy*fy - target.radius*target.radius;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return false;
+  const t = (-b - Math.sqrt(disc)) / (2*a);
+  return t >= 0 && t <= 1;
+}
+
+// =====================================================
+// RENDER
+// =====================================================
+let animT = 0;
+let laserOffset = 0;
+
+function render(t) {
+  animT = t;
+  laserOffset = (t * 0.15) % 20;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background vignette
+  const vg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W*0.7);
+  vg.addColorStop(0, 'rgba(15,5,5,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw obstacles
+  for (const obs of obstacles) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,50,50,0.7)';
+    ctx.fillStyle = 'rgba(40,0,0,0.8)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(255,50,50,0.5)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,50,50,0.4)';
+    ctx.font = '11px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('⛔', obs.x, obs.y+4);
+    ctx.restore();
+  }
+
+  // Draw target (sensor)
+  drawTarget(t);
+
+  // Trace & draw laser
+  traceRay();
+  drawLaser(t);
+
+  // Draw mirrors
+  for (const m of mirrors) {
+    m.draw(t);
+  }
+
+  // Draw laser source
+  drawSource(t);
+
+  // Update HUD angles
+  const m1 = mirrors[0], m2 = mirrors[1];
+  const deg1 = Math.round(((m1.angle * 180/Math.PI) % 180 + 180) % 180);
+  const deg2 = Math.round(((m2.angle * 180/Math.PI) % 180 + 180) % 180);
+  document.getElementById('m1Angle').textContent = deg1 + '°';
+  document.getElementById('m2Angle').textContent = deg2 + '°';
+
+  if (solved && gameState === 'playing') {
+    gameState = 'won';
+    setTimeout(showWin, 400);
+  }
+
+  requestAnimationFrame(render);
+}
+
+function drawSource(t) {
+  ctx.save();
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.005);
+  ctx.shadowColor = 'rgba(255,50,50,0.9)';
+  ctx.shadowBlur = 15 + 10 * pulse;
+  ctx.fillStyle = '#ff2222';
+  ctx.beginPath();
+  ctx.arc(laser.x, laser.y, 7, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,100,100,0.8)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.arc(laser.x, laser.y, 2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,50,50,0.6)';
+  ctx.font = '9px Share Tech Mono';
+  ctx.fillText('LASER', laser.x + 10, laser.y - 8);
+  ctx.restore();
+}
+
+function drawTarget(t) {
+  ctx.save();
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.004);
+  const col = solved ? 'rgba(0,255,136,' : 'rgba(255,200,0,';
+  ctx.strokeStyle = col + '0.9)';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = col + '0.8)';
+  ctx.shadowBlur = 12 + 8 * pulse;
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, target.radius, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.strokeStyle = col + '0.4)';
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, target.radius * 0.6, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.fillStyle = solved ? 'rgba(0,255,136,0.15)' : 'rgba(255,200,0,0.08)';
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, target.radius, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = col + '0.7)';
+  ctx.font = '10px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('CAPTEUR', target.x, target.y + target.radius + 14);
+  ctx.restore();
+}
+
+function drawLaser(t) {
+  if (laserPath.length < 2) return;
+  ctx.save();
+
+  for (let i = 0; i < laserPath.length - 1; i++) {
+    const p1 = laserPath[i], p2 = laserPath[i+1];
+
+    // Outer glow
+    ctx.strokeStyle = solved ? 'rgba(0,255,136,0.15)' : 'rgba(255,20,20,0.12)';
+    ctx.lineWidth = 12;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    // Mid glow
+    ctx.strokeStyle = solved ? 'rgba(0,255,136,0.35)' : 'rgba(255,30,30,0.35)';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = solved ? 'rgba(0,255,136,0.8)' : 'rgba(255,20,20,0.8)';
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    // Core beam
+    ctx.strokeStyle = solved ? 'rgba(180,255,220,0.95)' : 'rgba(255,200,200,0.95)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+
+    // Animated dashes
+    ctx.setLineDash([5, 15]);
+    ctx.lineDashOffset = -laserOffset;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Reflection point markers
+  for (let i = 1; i < laserPath.length - 1; i++) {
+    const p = laserPath[i];
+    ctx.fillStyle = 'rgba(255,255,100,0.8)';
+    ctx.shadowColor = 'rgba(255,255,0,0.9)';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// =====================================================
+// INTERACTION
+// =====================================================
+let dragging = null;
+let rightClickMirror = null;
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 2) {
+    e.preventDefault();
+    const pos = getPos(e);
+    for (const m of mirrors) {
+      if (m.hitTest(pos.x, pos.y)) {
+        rightClickMirror = m;
+        break;
+      }
+    }
+    return;
+  }
+  const pos = getPos(e);
+  for (const m of [...mirrors].reverse()) {
+    if (m.hitTest(pos.x, pos.y)) {
+      dragging = m;
+      m.dragOffX = pos.x - m.x;
+      m.dragOffY = pos.y - m.y;
+      m.highlight = true;
+      break;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    const pos = getPos(e);
+    dragging.x = pos.x - dragging.dragOffX;
+    dragging.y = pos.y - dragging.dragOffY;
+  }
+  if (rightClickMirror) {
+    const pos = getPos(e);
+    const dx = pos.x - rightClickMirror.x;
+    const dy = pos.y - rightClickMirror.y;
+    rightClickMirror.angle = Math.atan2(dy, dx);
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (dragging) { dragging.highlight = false; dragging = null; }
+  rightClickMirror = null;
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const pos = getPos(e);
+  for (const m of [...mirrors].reverse()) {
+    if (m.hitTest(pos.x, pos.y)) {
+      dragging = m;
+      m.dragOffX = pos.x - m.x;
+      m.dragOffY = pos.y - m.y;
+      m.highlight = true;
+      break;
+    }
+  }
+});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (dragging) {
+    const pos = getPos(e);
+    dragging.x = pos.x - dragging.dragOffX;
+    dragging.y = pos.y - dragging.dragOffY;
+  }
+});
+
+canvas.addEventListener('touchend', () => {
+  if (dragging) { dragging.highlight = false; dragging = null; }
+});
+
+// Mouse wheel to rotate
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const pos = getPos(e);
+  for (const m of mirrors) {
+    if (m.hitTest(pos.x, pos.y)) {
+      m.angle += e.deltaY > 0 ? 0.05 : -0.05;
+      break;
+    }
+  }
+}, { passive: false });
+
+// =====================================================
+// GAME LOGIC
+// =====================================================
+function resize() {
+  const rect = frame.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = W;
+  canvas.height = H;
+  if (levels.length > 0) initLevel(currentLevel);
+}
+
+function initLevel(idx) {
+  if (idx >= levels.length) {
+    showComplete(); return;
+  }
+  const lvl = levels[idx];
+  solved = false;
+  gameState = 'playing';
+
+  laser = {
+    x: lvl.laser.x * W,
+    y: lvl.laser.y * H,
+    dir: lvl.laser.dir
+  };
+
+  target = {
+    x: lvl.target.x * W,
+    y: lvl.target.y * H,
+    radius: lvl.target.targetRadius || 20
+  };
+
+  obstacles = (lvl.obstacles || []).map(o => ({
+    x: o.x * W, y: o.y * H, r: o.r * Math.min(W, H)
+  }));
+
+  // Reset mirrors to default positions
+  mirrors = levels[idx].mirrors.map(m => {
+    const nm = new Mirror(m.x * W, m.y * H, Math.min(W, H) * 0.12, m.angle, m.id);
+    return nm;
+  });
+
+  document.getElementById('levelDisplay').textContent = String(idx+1).padStart(2,'0');
+  document.getElementById('statusText').textContent = lvl.hint || 'Guidez le laser vers le capteur';
+  document.getElementById('statusText').className = 'status-text';
+
+  updateDots();
+
+  document.getElementById('checkBtn').className = 'btn';
+}
+
+function updateDots() {
+  const container = document.getElementById('levelDots');
+  container.innerHTML = '';
+  for (let i = 0; i < levels.length; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (completedLevels.includes(i) ? ' done' : '') + (i === currentLevel ? ' current' : '');
+    container.appendChild(d);
+  }
+}
+
+function checkSolution() {
+  traceRay();
+  if (solved) {
+    gameState = 'won';
+    showWin();
+  } else {
+    document.getElementById('statusText').textContent = '✗ Le laser n\'atteint pas le capteur';
+    document.getElementById('statusText').className = 'status-text error';
+    document.getElementById('checkBtn').classList.add('error');
+    setTimeout(() => {
+      document.getElementById('statusText').className = 'status-text';
+      document.getElementById('checkBtn').classList.remove('error');
+    }, 2000);
+  }
+}
+
+function showWin() {
+  if (!completedLevels.includes(currentLevel)) completedLevels.push(currentLevel);
+  
+  const m1 = mirrors[0], m2 = mirrors[1];
+  const deg1 = Math.round(((m1.angle * 180/Math.PI) % 180 + 180) % 180);
+  const deg2 = Math.round(((m2.angle * 180/Math.PI) % 180 + 180) % 180);
+  const between = Math.abs(deg1 - deg2);
+  const angleBetween = Math.min(between, 180 - between);
+
+  document.getElementById('winAngles').textContent =
+    `M1: ${deg1}°  |  M2: ${deg2}°  |  Écart: ~${angleBetween}°`;
+
+  document.getElementById('winPhysics').innerHTML =
+    `i₁ = r₁ ✓ &nbsp;&nbsp; i₂ = r₂ ✓<br>Réflexions: ${laserPath.length - 1}`;
+
+  document.getElementById('winOverlay').classList.remove('hidden');
+  document.getElementById('checkBtn').className = 'btn success';
+}
+
+function nextLevel() {
+  document.getElementById('winOverlay').classList.add('hidden');
+  currentLevel++;
+  if (currentLevel >= levels.length) {
+    showComplete();
+  } else {
+    initLevel(currentLevel);
+    gameState = 'playing';
+  }
+}
+
+function retryLevel() {
+  document.getElementById('failOverlay').classList.add('hidden');
+  initLevel(currentLevel);
+  gameState = 'playing';
+}
+
+function resetLevel() {
+  initLevel(currentLevel);
+  gameState = 'playing';
+}
+
+function showComplete() {
+  document.getElementById('winOverlay').classList.add('hidden');
+  document.getElementById('completeOverlay').classList.remove('hidden');
+}
+
+function resetGame() {
+  document.getElementById('completeOverlay').classList.add('hidden');
+  currentLevel = 0;
+  completedLevels = [];
+  initLevel(0);
+  gameState = 'playing';
+}
+
+function startGame() {
+  document.getElementById('introOverlay').classList.add('hidden');
+  levels = makeLevels();
+  resize();
+  requestAnimationFrame(render);
+}
+
+window.addEventListener('resize', () => {
+  resize();
+});
+
+// Initial resize
+setTimeout(() => resize(), 50);
+</script>
+</body>
+</html>
